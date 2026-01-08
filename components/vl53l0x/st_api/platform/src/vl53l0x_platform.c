@@ -136,3 +136,50 @@ void VL53L0X_WaitMs(VL53L0X_DEV Dev, int32_t wait_ms)
     if (wait_ms <= 0) return;
     vTaskDelay(pdMS_TO_TICKS((uint32_t)wait_ms));
 }
+
+// -----------------------------------------------------------------------------
+// Compat ST "platform" legacy symbols
+// -----------------------------------------------------------------------------
+// Certaines versions de la ST API (et/ou certains ports) utilisent les symboles
+// VL53L0X_WrByte/RdByte/... au lieu de VL53L0X_WriteByte/ReadByte/...
+// Les sources core du repo que tu compiles les attendent.
+
+VL53L0X_Error VL53L0X_WrByte(VL53L0X_DEV Dev, uint8_t index, uint8_t data)
+{
+    return VL53L0X_WriteByte(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_RdByte(VL53L0X_DEV Dev, uint8_t index, uint8_t *data)
+{
+    return VL53L0X_ReadByte(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_WrWord(VL53L0X_DEV Dev, uint8_t index, uint16_t data)
+{
+    return VL53L0X_WriteWord(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_RdWord(VL53L0X_DEV Dev, uint8_t index, uint16_t *data)
+{
+    return VL53L0X_ReadWord(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_WrDWord(VL53L0X_DEV Dev, uint8_t index, uint32_t data)
+{
+    return VL53L0X_WriteDWord(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_RdDWord(VL53L0X_DEV Dev, uint8_t index, uint32_t *data)
+{
+    return VL53L0X_ReadDWord(Dev, index, data);
+}
+
+VL53L0X_Error VL53L0X_UpdateByte(VL53L0X_DEV Dev, uint8_t index, uint8_t AndData, uint8_t OrData)
+{
+    uint8_t v = 0;
+    VL53L0X_Error st = VL53L0X_RdByte(Dev, index, &v);
+    if (st != VL53L0X_ERROR_NONE) return st;
+
+    v = (uint8_t)((v & AndData) | OrData);
+    return VL53L0X_WrByte(Dev, index, v);
+}

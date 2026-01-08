@@ -12,6 +12,9 @@ idf_component_register(
         "st_api/platform/src/vl53l0x_platform_log.c"
         "st_api/platform/src/vl53l0x_i2c_platform.c"
 
+        # ---- ESP-IDF driver layer ----
+        "src/vl53l0x_driver.c"
+
     INCLUDE_DIRS
         "include"
 

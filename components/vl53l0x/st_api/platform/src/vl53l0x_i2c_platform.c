@@ -28,7 +28,7 @@ static i2c_master_dev_handle_t s_dev[128] = {0};
 /* Valeurs par défaut */
 #define VL53_I2C_TIMEOUT_MS      (50)
 #define VL53_I2C_ADDR_7B_DEFAULT (0x29)
-#define VL53_I2C_CLK_DEFAULT_HZ  (400000)
+#define VL53_I2C_CLK_DEFAULT_HZ  (100000)
 
 /* =========================
  *  Internal I2C helpers
@@ -46,10 +46,8 @@ static esp_err_t i2c_bus_init_once(gpio_num_t sda, gpio_num_t scl)
         .scl_io_num = scl,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        .intr_priority = 0,
-        .trans_queue_depth = 16,
         .flags = {
-            .enable_internal_pullup = 1, /* mets 0 si pullups externes */
+            .enable_internal_pullup = 0, /* mets 0 si pullups externes */
         },
     };
 
@@ -139,157 +137,4 @@ esp_err_t vl53l0x_i2c_read_reg(uint8_t addr_7b, uint8_t reg,
     return i2c_master_transmit_receive(dev, &reg, 1, data, len, VL53_I2C_TIMEOUT_MS);
 }
 
-/* =========================
- *  ST init sequence
- * ========================= */
-
-static esp_err_t st_init_sequence(VL53L0X_Dev_t *pDevice, uint32_t timing_budget_us)
-{
-    VL53L0X_Error st;
-    uint8_t isApertureSpads = 0;
-    uint32_t refSpadCount = 0;
-    uint8_t VhvSettings = 0, PhaseCal = 0;
-
-    st = VL53L0X_DataInit(pDevice);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    st = VL53L0X_StaticInit(pDevice);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    st = VL53L0X_PerformRefSpadManagement(pDevice, &refSpadCount, &isApertureSpads);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    st = VL53L0X_PerformRefCalibration(pDevice, &VhvSettings, &PhaseCal);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    st = VL53L0X_SetDeviceMode(pDevice, VL53L0X_DEVICEMODE_SINGLE_RANGING);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    st = VL53L0X_SetMeasurementTimingBudgetMicroSeconds(pDevice, timing_budget_us);
-    if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
-
-    return ESP_OK;
-}
-
-/* =========================
- *  Multi-sensor address assign using XSHUT
- * ========================= */
-
-esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
-                                        int slot_count,
-                                        uint32_t boot_delay_ms)
-{
-    if (!slots || slot_count <= 0) return ESP_ERR_INVALID_ARG;
-    if (s_bus == NULL) return ESP_ERR_INVALID_STATE;
-
-    /* 1) XSHUT GPIO init + all OFF */
-    for (int i = 0; i < slot_count; i++) {
-        gpio_num_t g = slots[i].xshut_gpio;
-        if (g == GPIO_NUM_MAX) return ESP_ERR_INVALID_ARG;
-
-        gpio_config_t io = {0};
-        io.mode = GPIO_MODE_OUTPUT;
-        io.pin_bit_mask = (1ULL << g);
-        esp_err_t err = gpio_config(&io);
-        if (err != ESP_OK) return err;
-
-        gpio_set_level(g, 0);
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-
-    /* 2) One-by-one: ON -> set addr -> keep ON */
-    for (int i = 0; i < slot_count; i++) {
-
-        gpio_set_level(slots[i].xshut_gpio, 1);
-        vTaskDelay(pdMS_TO_TICKS(boot_delay_ms));
-
-        /* Sensor must respond at default address */
-        esp_err_t err = vl53l0x_i2c_probe(VL53_I2C_ADDR_7B_DEFAULT);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Probe default 0x%02X failed slot=%d err=%d",
-                     VL53_I2C_ADDR_7B_DEFAULT, i, (int)err);
-            return err;
-        }
-
-        VL53L0X_Dev_t st = {0};
-        st.I2cDevAddr = VL53_I2C_ADDR_7B_DEFAULT; /* 7-bit */
-        st.comms_speed_khz = 400;
-
-        /* ST expects left-aligned address => << 1 */
-        VL53L0X_Error st_err = VL53L0X_SetDeviceAddress(&st, (uint8_t)(slots[i].new_addr_7b << 1));
-        if (st_err != VL53L0X_ERROR_NONE) {
-            ESP_LOGE(TAG, "SetDeviceAddress slot=%d failed st=%d", i, (int)st_err);
-            return ESP_FAIL;
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(5));
-
-        err = vl53l0x_i2c_probe(slots[i].new_addr_7b);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Probe new 0x%02X failed slot=%d err=%d",
-                     slots[i].new_addr_7b, i, (int)err);
-            return err;
-        }
-
-        ESP_LOGI(TAG, "Slot %d addr=0x%02X XSHUT=%d",
-                 i, slots[i].new_addr_7b, (int)slots[i].xshut_gpio);
-    }
-
-    return ESP_OK;
-}
-
-/* =========================
- *  Public sensor API
- * ========================= */
-
-esp_err_t vl53l0x_init(vl53l0x_dev_t *dev, uint32_t timing_budget_us)
-{
-    if (!dev) return ESP_ERR_INVALID_ARG;
-    if (s_bus == NULL) return ESP_ERR_INVALID_STATE;
-
-    esp_err_t err = vl53l0x_i2c_probe(dev->addr_7b);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "No response at 0x%02X err=%d", dev->addr_7b, (int)err);
-        return err;
-    }
-
-    VL53L0X_Dev_t st = {0};
-    st.I2cDevAddr = dev->addr_7b;
-    st.comms_speed_khz = 400;
-
-    (void)VL53L0X_ResetDevice(&st);
-    vTaskDelay(pdMS_TO_TICKS(5));
-
-    err = st_init_sequence(&st, timing_budget_us);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ST init failed addr=0x%02X", dev->addr_7b);
-        return err;
-    }
-
-    ESP_LOGI(TAG, "Init OK addr=0x%02X budget=%" PRIu32 " us", dev->addr_7b, timing_budget_us);
-    return ESP_OK;
-}
-
-esp_err_t vl53l0x_read_mm(vl53l0x_dev_t *dev, uint16_t *out_mm)
-{
-    if (!dev || !out_mm) return ESP_ERR_INVALID_ARG;
-    if (s_bus == NULL) return ESP_ERR_INVALID_STATE;
-
-    VL53L0X_Dev_t st = {0};
-    st.I2cDevAddr = dev->addr_7b;
-    st.comms_speed_khz = 400;
-
-    VL53L0X_RangingMeasurementData_t data = {0};
-    VL53L0X_Error st_err = VL53L0X_PerformSingleRangingMeasurement(&st, &data);
-    if (st_err != VL53L0X_ERROR_NONE) {
-        ESP_LOGW(TAG, "Ranging failed st=%d addr=0x%02X", (int)st_err, dev->addr_7b);
-        return ESP_FAIL;
-    }
-
-    if (data.RangeStatus != 0) {
-        return ESP_FAIL;
-    }
-
-    *out_mm = data.RangeMilliMeter;
-    return ESP_OK;
-}
+// ---- End of ESP-IDF I2C wrapper layer (used by ST platform) ----

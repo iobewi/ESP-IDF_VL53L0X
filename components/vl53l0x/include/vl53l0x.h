@@ -6,6 +6,8 @@
 #include "esp_err.h"
 #include "driver/gpio.h"
 
+#include "vl53l0x_api.h" 
+
 /* =========================
  *  Constants
  * ========================= */
@@ -22,6 +24,8 @@
  */
 typedef struct {
     uint8_t     addr_7b;     /**< Adresse I2C 7-bit */
+    VL53L0X_Dev_t st;   // état ST persistant
+    bool inited;
 } vl53l0x_dev_t;
 
 /**
