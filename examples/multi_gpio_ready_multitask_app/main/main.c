@@ -7,7 +7,7 @@
 
 static const char *TAG = "multi_gpio_ready_mt";
 
-// Ajuste ces GPIO à ton PCB
+// Adjust these GPIOs to match your PCB layout.
 #define PIN_SDA GPIO_NUM_8
 #define PIN_SCL GPIO_NUM_9
 
