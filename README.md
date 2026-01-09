@@ -55,6 +55,31 @@ uint16_t mm = 0;
 ESP_ERROR_CHECK(vl53l0x_read_mm(&dev, &mm));
 ```
 
+### GPIO “data ready” (GPIO/INT)
+
+Pour piloter la mesure via l’interruption du capteur :
+
+```c
+ESP_ERROR_CHECK(vl53l0x_enable_gpio_ready(&dev, GPIO_NUM_7, true));
+
+VL53L0X_StartMeasurement(&dev.st);
+ESP_ERROR_CHECK(vl53l0x_wait_gpio_ready(&dev, pdMS_TO_TICKS(1000)));
+VL53L0X_GetRangingMeasurementData(&dev.st, &data);
+VL53L0X_ClearInterruptMask(&dev.st, 0);
+VL53L0X_StopMeasurement(&dev.st);
+```
+
+Un exemple complet est disponible dans `examples/gpio_ready_app`.
+
+#### Câblage du pin GPIO/INT
+
+- Relier **GPIO/INT** du VL53L0X à un GPIO d’entrée ESP-IDF (`int_gpio`).
+- Alimenter le capteur en **3.3V** (adapter si votre module impose 5V).
+- GND commun.
+- La polarité est configurable via `active_high` (ex. `true` = front montant).
+- Si votre module ne fournit pas de pull-up interne, activez-en un externe ou
+  `GPIO_PULLUP_ENABLE` côté ESP selon votre schéma.
+
 ## Multi-capteurs (XSHUT)
 
 Le VL53L0X a une adresse par défaut **0x29**. Pour plusieurs capteurs sur le même bus, il faut :

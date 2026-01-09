@@ -5,10 +5,13 @@
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
+
+#include "driver/gpio.h"
 
 #include "vl53l0x_api.h"
 #include "vl53l0x_def.h"
@@ -21,6 +24,7 @@
  */
 
 static const char *TAG = "vl53l0x";
+static bool isr_service_installed = false;
 
 /* Ces symboles sont implémentés dans st_api/platform/src/vl53l0x_i2c_platform.c */
 extern esp_err_t vl53l0x_i2c_master_init(gpio_num_t sda,
@@ -56,6 +60,20 @@ static esp_err_t st_init_sequence(VL53L0X_Dev_t *pDevice, uint32_t timing_budget
     if (st != VL53L0X_ERROR_NONE) return ESP_FAIL;
 
     return ESP_OK;
+}
+
+static void IRAM_ATTR vl53l0x_gpio_isr_handler(void *arg)
+{
+    vl53l0x_dev_t *dev = (vl53l0x_dev_t *)arg;
+    BaseType_t task_woken = pdFALSE;
+
+    if (dev && dev->gpio_ready_sem) {
+        xSemaphoreGiveFromISR(dev->gpio_ready_sem, &task_woken);
+    }
+
+    if (task_woken == pdTRUE) {
+        portYIELD_FROM_ISR();
+    }
 }
 
 /* =========================
@@ -201,4 +219,78 @@ esp_err_t vl53l0x_read_mm(vl53l0x_dev_t *dev, uint16_t *mm)
 
     *mm = (uint16_t)data.RangeMilliMeter;
     return ESP_OK;
+}
+
+esp_err_t vl53l0x_enable_gpio_ready(vl53l0x_dev_t *dev,
+                                   gpio_num_t int_gpio,
+                                   bool active_high)
+{
+    if (!dev) return ESP_ERR_INVALID_ARG;
+    if (!dev->inited) return ESP_ERR_INVALID_STATE;
+    if (int_gpio == GPIO_NUM_MAX) return ESP_ERR_INVALID_ARG;
+
+    VL53L0X_InterruptPolarity polarity = active_high
+        ? VL53L0X_INTERRUPTPOLARITY_HIGH
+        : VL53L0X_INTERRUPTPOLARITY_LOW;
+
+    VL53L0X_Error st = VL53L0X_SetGpioConfig(&dev->st,
+                                            0,
+                                            VL53L0X_DEVICEMODE_SINGLE_RANGING,
+                                            VL53L0X_GPIOFUNCTIONALITY_NEW_MEASURE_READY,
+                                            polarity);
+    if (st != VL53L0X_ERROR_NONE) {
+        ESP_LOGE(TAG, "SetGpioConfig failed st=%d", (int)st);
+        return ESP_FAIL;
+    }
+
+    if (!dev->gpio_ready_sem) {
+        dev->gpio_ready_sem = xSemaphoreCreateBinary();
+        if (!dev->gpio_ready_sem) return ESP_ERR_NO_MEM;
+    }
+
+    if (dev->gpio_ready_enabled) {
+        gpio_isr_handler_remove(dev->int_gpio);
+    }
+
+    gpio_config_t io = {0};
+    io.mode = GPIO_MODE_INPUT;
+    io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io.pull_up_en = GPIO_PULLUP_DISABLE;
+    io.pin_bit_mask = (1ULL << int_gpio);
+    io.intr_type = active_high ? GPIO_INTR_POSEDGE : GPIO_INTR_NEGEDGE;
+
+    esp_err_t err = gpio_config(&io);
+    if (err != ESP_OK) return err;
+
+    if (!isr_service_installed) {
+        err = gpio_install_isr_service(0);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            return err;
+        }
+        isr_service_installed = true;
+    }
+
+    err = gpio_isr_handler_add(int_gpio, vl53l0x_gpio_isr_handler, dev);
+    if (err != ESP_OK) return err;
+
+    dev->gpio_ready_enabled = true;
+    dev->gpio_active_high = active_high;
+    dev->int_gpio = int_gpio;
+
+    ESP_LOGI(TAG, "GPIO ready enabled int=%d active_%s",
+             (int)int_gpio,
+             active_high ? "high" : "low");
+    return ESP_OK;
+}
+
+esp_err_t vl53l0x_wait_gpio_ready(vl53l0x_dev_t *dev, TickType_t timeout)
+{
+    if (!dev) return ESP_ERR_INVALID_ARG;
+    if (!dev->gpio_ready_enabled || !dev->gpio_ready_sem) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    return (xSemaphoreTake(dev->gpio_ready_sem, timeout) == pdTRUE)
+        ? ESP_OK
+        : ESP_ERR_TIMEOUT;
 }
