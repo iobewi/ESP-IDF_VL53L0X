@@ -1,7 +1,8 @@
 #include "vl53l0x.h"
 
-#include <string.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -67,6 +68,27 @@ esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
 {
     if (!slots || slot_count <= 0) return ESP_ERR_INVALID_ARG;
 
+    bool seen_addr[128] = {0};
+    for (int i = 0; i < slot_count; i++) {
+        uint8_t addr = slots[i].new_addr_7b;
+
+        if (addr < 0x08 || addr > 0x77) {
+            ESP_LOGE(TAG, "Invalid 7-bit addr 0x%02X slot=%d", addr, i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (addr == VL53L0X_I2C_ADDRESS_DEFAULT_7B) {
+            ESP_LOGE(TAG, "Default addr 0x%02X not allowed slot=%d", addr, i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (seen_addr[addr]) {
+            ESP_LOGE(TAG, "Duplicate addr 0x%02X slot=%d", addr, i);
+            return ESP_ERR_INVALID_ARG;
+        }
+        seen_addr[addr] = true;
+    }
+
     /* 1) XSHUT GPIO init + all OFF */
     for (int i = 0; i < slot_count; i++) {
         gpio_num_t g = slots[i].xshut_gpio;
@@ -97,7 +119,7 @@ esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
         }
 
         VL53L0X_Dev_t st = {0};
-        st.I2cDevAddr = VL53L0X_I2C_ADDRESS_DEFAULT_7B; /* 7-bit */
+        st.I2cDevAddr = (uint8_t)(VL53L0X_I2C_ADDRESS_DEFAULT_7B << 1); /* 8-bit left-aligned */
         st.comms_speed_khz = 400;
 
         /* ST expects left-aligned address => << 1 */

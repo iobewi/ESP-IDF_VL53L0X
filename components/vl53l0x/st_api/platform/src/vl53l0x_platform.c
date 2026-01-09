@@ -28,20 +28,14 @@ static inline uint32_t dev_clk_hz(const VL53L0X_DEV Dev)
 static inline uint8_t dev_addr_7b(const VL53L0X_DEV Dev)
 {
     // IMPORTANT:
-    // Dans l’API ST, I2cDevAddr est historiquement une adresse 8-bit "left aligned" (7b << 1).
+    // Dans l’API ST, I2cDevAddr est stockée en 8-bit "left aligned" (7b << 1).
     // Ex: 0x29 -> 0x52
-    // On convertit ici en 7-bit pour nos wrappers ESP-IDF.
+    // On convertit ici systématiquement en 7-bit pour nos wrappers ESP-IDF.
     if (!Dev) return 0;
 
     uint8_t a = Dev->I2cDevAddr;
 
-    // Si c’est déjà une 7-bit (rare, mais possible selon ports), on ne la décale pas.
-    // Heuristique simple : si LSB=1, c’est souvent une 7-bit (ex: 0x29), sinon souvent 8-bit (0x52).
-    // On privilégie le cas standard ST: 8-bit => >> 1.
-    if ((a & 0x01) == 0) {
-        return (uint8_t)(a >> 1);
-    }
-    return a;
+    return (uint8_t)(a >> 1);
 }
 
 /**
