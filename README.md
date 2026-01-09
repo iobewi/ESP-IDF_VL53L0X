@@ -41,6 +41,13 @@ vl53l0x_dev_t dev = {
 ESP_ERROR_CHECK(vl53l0x_init(&dev, /* timing_budget_us */ 33000));
 ```
 
+#### Spécificité d’adressage ST (`I2cDevAddr`)
+
+La ST API attend que `I2cDevAddr` soit stockée en **adresse 8‑bit left‑aligned** (`7b << 1`).
+La couche platform convertit ensuite systématiquement vers une adresse 7‑bit pour les accès I2C.
+Si vous manipulez directement des structures ST, gardez ce format en tête pour éviter un
+décalage inattendu (ex. `0x29` stocké en 7‑bit deviendrait `0x14` après conversion).
+
 ### Lecture simple (mm)
 
 ```c
@@ -92,4 +99,3 @@ Le mapping est réalisé dans `st_api/platform/src/vl53l0x_platform_log.c` via `
 
 - La couche platform (ST) ne doit **pas** contenir de logique produit (multi-capteurs, init “user-friendly”, etc.).
 - Le bus I2C “master” est préféré à une implémentation maison : il est maintenu par Espressif, thread-safe au bon niveau, et intégré au modèle de drivers ESP-IDF.
-
