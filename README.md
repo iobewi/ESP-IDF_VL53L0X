@@ -1,26 +1,33 @@
-# ESP-IDF VL53L0X (ST API + platform ESP-IDF)
+# ESP-IDF VL53L0X (ST API + ESP-IDF platform)
 
-Ce dépôt fournit une intégration de la **ST VL53L0X API** (code `st_api/core`) avec une couche **platform** adaptée à **ESP-IDF** (I2C + logs), ainsi qu'une petite “driver layer” orientée usage.
+> 🇫🇷 Version française: [README_FR.md](README_FR.md)
 
-## Organisation des couches
+This repository provides an integration of the **ST VL53L0X API** (`st_api/core`) with an **ESP-IDF**-specific **platform** layer (I2C + logs), plus a small usage-oriented driver layer.
 
-- `components/vl53l0x/st_api/core/*` : code ST “stock” (à garder inchangé autant que possible)
-- `components/vl53l0x/st_api/platform/*` : **adapter** attendu par la ST API
-  - `vl53l0x_platform.c` : implémente `VL53L0X_ReadMulti/WriteMulti/...` en s’appuyant sur des wrappers I2C ESP-IDF
-  - `vl53l0x_i2c_platform.c` : implémente **uniquement** les wrappers I2C bas niveau utilisés par `vl53l0x_platform.c`
-  - `vl53l0x_platform_log.c` : optionnel, mappe les traces ST vers `ESP_LOGx`
-  - headers “ST platform” conservés : `vl53l0x_types.h`, `vl53l0x_platform.h`, `vl53l0x_i2c_platform.h`, `vl53l0x_platform_log.h`
-- `components/vl53l0x/include/vl53l0x.h` + `components/vl53l0x/src/vl53l0x_driver.c` :
-  - API ESP-IDF “pratique” (`vl53l0x_init`, `vl53l0x_read_mm`, adressage multi-capteurs via XSHUT, etc.)
+## Layer organization
 
-L’objectif est de **séparer clairement** :
-1) la ST API (intouchable),
-2) la couche platform (contrat ST),
-3) l’API “driver” ESP-IDF (ergonomie / multi-capteurs).
+- `components/vl53l0x/st_api/core/*`: stock ST code (keep unchanged whenever possible)
+- `components/vl53l0x/st_api/platform/*`: **adapter** required by the ST API
+  - `vl53l0x_platform.c`: implements `VL53L0X_ReadMulti/WriteMulti/...` using ESP-IDF I2C wrappers
+  - `vl53l0x_i2c_platform.c`: implements only the low-level I2C wrappers used by `vl53l0x_platform.c`
+  - `vl53l0x_platform_log.c`: optional, maps ST traces to `ESP_LOGx`
+  - preserved “ST platform” headers: `vl53l0x_types.h`, `vl53l0x_platform.h`, `vl53l0x_i2c_platform.h`, `vl53l0x_platform_log.h`
+- `components/vl53l0x/include/vl53l0x.h` + `components/vl53l0x/src/vl53l0x_driver.c`:
+  - ergonomic ESP-IDF API (`vl53l0x_init`, `vl53l0x_read_mm`, multi-sensor addressing via XSHUT, etc.)
 
-## API ESP-IDF (haut niveau)
+The goal is to **clearly separate**:
+1) the ST API (untouched),
+2) the platform layer (ST contract),
+3) the ESP-IDF driver API (ergonomics / multi-sensor).
 
-### Initialisation du bus I2C
+## Prerequisites
+
+- **ESP-IDF** (recent version with `driver/i2c_master.h`)
+- A properly powered **VL53L0X** sensor (3.3V)
+
+## Quick start
+
+### I2C bus initialization
 
 ```c
 #include "vl53l0x.h"
@@ -28,10 +35,10 @@ L’objectif est de **séparer clairement** :
 ESP_ERROR_CHECK(vl53l0x_i2c_master_init(GPIO_NUM_8, GPIO_NUM_9, 400000));
 ```
 
-- Le wrapper utilise le **nouveau driver I2C** (`driver/i2c_master.h`).
-- Une table de handles par adresse 7-bit est utilisée pour éviter de recréer les devices en boucle.
+- The wrapper uses the **new I2C driver** (`driver/i2c_master.h`).
+- A handle table per 7-bit address avoids recreating devices repeatedly.
 
-### Initialisation d’un capteur
+### Sensor initialization
 
 ```c
 vl53l0x_dev_t dev = {
@@ -41,23 +48,23 @@ vl53l0x_dev_t dev = {
 ESP_ERROR_CHECK(vl53l0x_init(&dev, /* timing_budget_us */ 33000));
 ```
 
-#### Spécificité d’adressage ST (`I2cDevAddr`)
+#### ST addressing specificity (`I2cDevAddr`)
 
-La ST API attend que `I2cDevAddr` soit stockée en **adresse 8‑bit left‑aligned** (`7b << 1`).
-La couche platform convertit ensuite systématiquement vers une adresse 7‑bit pour les accès I2C.
-Si vous manipulez directement des structures ST, gardez ce format en tête pour éviter un
-décalage inattendu (ex. `0x29` stocké en 7‑bit deviendrait `0x14` après conversion).
+The ST API expects `I2cDevAddr` stored as **left-aligned 8-bit address** (`7b << 1`).
+The platform layer consistently converts to 7-bit addresses for I2C access.
+If you manipulate ST structures directly, keep this format in mind to avoid
+unexpected shifts (e.g., `0x29` stored as 7-bit becomes `0x14` after conversion).
 
-### Lecture simple (mm)
+### Single read (mm)
 
 ```c
 uint16_t mm = 0;
 ESP_ERROR_CHECK(vl53l0x_read_mm(&dev, &mm));
 ```
 
-### GPIO “data ready” (GPIO/INT)
+## GPIO “data ready” (GPIO/INT)
 
-Pour piloter la mesure via l’interruption du capteur :
+To drive measurements via the sensor interrupt:
 
 ```c
 ESP_ERROR_CHECK(vl53l0x_enable_gpio_ready(&dev, GPIO_NUM_7, true));
@@ -68,30 +75,30 @@ VL53L0X_GetRangingMeasurementData(&dev.st, &data);
 VL53L0X_ClearInterruptMask(&dev.st, 0);
 ```
 
-Un exemple complet est disponible dans `examples/gpio_ready_app`.
-Un exemple combinant **multi-capteurs** + **GPIO ready** est disponible dans
+A full example is available in `examples/gpio_ready_app`.
+An example combining **multi-sensor** + **GPIO ready** is available in
 `examples/multi_gpio_ready_app`.
-Un exemple équivalent en **multi-task** (chaque capteur dans sa tâche) est
-disponible dans `examples/multi_gpio_ready_multitask_app`.
+An equivalent **multi-task** example (each sensor in its own task) is available in
+`examples/multi_gpio_ready_multitask_app`.
 
-#### Câblage du pin GPIO/INT
+### GPIO/INT wiring
 
-- Relier **GPIO/INT** du VL53L0X à un GPIO d’entrée ESP-IDF (`int_gpio`).
-- Alimenter le capteur en **3.3V** (adapter si votre module impose 5V).
-- GND commun.
-- La polarité est configurable via `active_high` (ex. `true` = front montant).
-- Si votre module ne fournit pas de pull-up interne, activez-en un externe ou
-  `GPIO_PULLUP_ENABLE` côté ESP selon votre schéma.
+- Connect **GPIO/INT** on the VL53L0X to an ESP-IDF input GPIO (`int_gpio`).
+- Power the sensor at **3.3V** (adapt if your module requires 5V).
+- Common ground.
+- Polarity is configurable via `active_high` (e.g., `true` = rising edge).
+- If your module lacks an internal pull-up, add an external one or enable
+  `GPIO_PULLUP_ENABLE` on the ESP side.
 
-## Multi-capteurs (XSHUT)
+## Multi-sensor (XSHUT)
 
-Le VL53L0X a une adresse par défaut **0x29**. Pour plusieurs capteurs sur le même bus, il faut :
-1) mettre tous les XSHUT à 0,
-2) réveiller **un seul** capteur,
-3) lui assigner une nouvelle adresse (`VL53L0X_SetDeviceAddress`),
-4) répéter.
+The VL53L0X default address is **0x29**. For multiple sensors on the same bus, you must:
+1) pull all XSHUT low,
+2) wake **only one** sensor,
+3) assign a new address (`VL53L0X_SetDeviceAddress`),
+4) repeat.
 
-L’helper `vl53l0x_multi_assign_addresses()` le fait pour vous.
+The helper `vl53l0x_multi_assign_addresses()` handles this for you.
 
 ```c
 vl53l0x_slot_t slots[] = {
@@ -102,7 +109,7 @@ vl53l0x_slot_t slots[] = {
 ESP_ERROR_CHECK(vl53l0x_multi_assign_addresses(slots, 2, /* boot_delay_ms */ 5));
 ```
 
-Ensuite, vous pouvez créer 2 instances :
+Then create two instances:
 
 ```c
 vl53l0x_dev_t a = { .addr_7b = 0x30 };
@@ -112,18 +119,18 @@ ESP_ERROR_CHECK(vl53l0x_init(&a, 33000));
 ESP_ERROR_CHECK(vl53l0x_init(&b, 33000));
 ```
 
-## Logs ST -> ESP_LOGx (optionnel)
+## ST logs -> ESP_LOGx (optional)
 
-Par défaut, les logs ST ne sont pas activés.  
-Si vous souhaitez activer les traces (pour debug), ajoutez une définition au composant :
+By default, ST logs are disabled.  
+To enable traces (for debugging), add a compile definition to the component:
 
 ```cmake
 target_compile_definitions(${COMPONENT_LIB} PRIVATE VL53L0X_LOG_ENABLE=1)
 ```
 
-Le mapping est réalisé dans `st_api/platform/src/vl53l0x_platform_log.c` via `esp_log_writev()`.
+Mapping happens in `st_api/platform/src/vl53l0x_platform_log.c` via `esp_log_writev()`.
 
-## Notes ESP-IDF
+## ESP-IDF notes
 
-- La couche platform (ST) ne doit **pas** contenir de logique produit (multi-capteurs, init “user-friendly”, etc.).
-- Le bus I2C “master” est préféré à une implémentation maison : il est maintenu par Espressif, thread-safe au bon niveau, et intégré au modèle de drivers ESP-IDF.
+- The ST platform layer must **not** include product logic (multi-sensor, user-friendly init, etc.).
+- The I2C “master” bus is preferred over a custom implementation: it is maintained by Espressif, sufficiently thread-safe, and integrated into the ESP-IDF driver model.
