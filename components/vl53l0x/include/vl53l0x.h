@@ -5,6 +5,8 @@
 
 #include "esp_err.h"
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "vl53l0x_api.h" 
 
@@ -26,6 +28,10 @@ typedef struct {
     uint8_t     addr_7b;     /**< Adresse I2C 7-bit */
     VL53L0X_Dev_t st;   // état ST persistant
     bool inited;
+    bool gpio_ready_enabled;
+    bool gpio_active_high;
+    gpio_num_t int_gpio;
+    SemaphoreHandle_t gpio_ready_sem;
 } vl53l0x_dev_t;
 
 /**
@@ -123,3 +129,26 @@ esp_err_t vl53l0x_init(vl53l0x_dev_t *dev,
  */
 esp_err_t vl53l0x_read_mm(vl53l0x_dev_t *dev,
                           uint16_t *out_mm);
+
+/**
+ * @brief Active le mode GPIO "data ready" (GPIO/INT)
+ *
+ * Configure le capteur via la ST API pour signaler "new measure ready"
+ * et initialise l'ISR/queue ESP-IDF pour l'attente d'événements.
+ *
+ * @param dev Capteur
+ * @param int_gpio GPIO ESP-IDF connecté au pin GPIO/INT du VL53L0X
+ * @param active_high true si le signal est actif à l'état haut
+ */
+esp_err_t vl53l0x_enable_gpio_ready(vl53l0x_dev_t *dev,
+                                   gpio_num_t int_gpio,
+                                   bool active_high);
+
+/**
+ * @brief Attend un front GPIO "data ready"
+ *
+ * @param dev Capteur
+ * @param timeout Timeout FreeRTOS (ticks)
+ */
+esp_err_t vl53l0x_wait_gpio_ready(vl53l0x_dev_t *dev,
+                                 TickType_t timeout);

@@ -8,7 +8,6 @@ static const char *TAG = "basic_app";
 
 #define PIN_SDA GPIO_NUM_8
 #define PIN_SCL GPIO_NUM_9
-
 void app_main(void)
 {
     ESP_LOGI(TAG, "Init I2C bus...");
