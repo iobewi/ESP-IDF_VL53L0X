@@ -37,19 +37,18 @@ void app_main(void)
         while (1) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
+    VL53L0X_Error st = VL53L0X_StartMeasurement(&dev.st);
+    if (st != VL53L0X_ERROR_NONE) {
+        ESP_LOGE(TAG, "StartMeasurement failed: %d", (int)st);
+        while (1) vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
     while (1) {
         VL53L0X_RangingMeasurementData_t data = {0};
-        VL53L0X_Error st = VL53L0X_StartMeasurement(&dev.st);
-        if (st != VL53L0X_ERROR_NONE) {
-            ESP_LOGW(TAG, "StartMeasurement failed: %d", (int)st);
-            vTaskDelay(pdMS_TO_TICKS(200));
-            continue;
-        }
 
         err = vl53l0x_wait_gpio_ready(&dev, pdMS_TO_TICKS(1000));
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "GPIO wait timeout: %s", esp_err_to_name(err));
-            VL53L0X_StopMeasurement(&dev.st);
             continue;
         }
 
@@ -65,7 +64,6 @@ void app_main(void)
         }
 
         VL53L0X_ClearInterruptMask(&dev.st, 0);
-        VL53L0X_StopMeasurement(&dev.st);
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }

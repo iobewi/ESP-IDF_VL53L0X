@@ -66,7 +66,6 @@ VL53L0X_StartMeasurement(&dev.st);
 ESP_ERROR_CHECK(vl53l0x_wait_gpio_ready(&dev, pdMS_TO_TICKS(1000)));
 VL53L0X_GetRangingMeasurementData(&dev.st, &data);
 VL53L0X_ClearInterruptMask(&dev.st, 0);
-VL53L0X_StopMeasurement(&dev.st);
 ```
 
 Un exemple complet est disponible dans `examples/gpio_ready_app`.

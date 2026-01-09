@@ -190,6 +190,11 @@ esp_err_t vl53l0x_init(vl53l0x_dev_t *dev, uint32_t timing_budget_us)
         return err;
     }
 
+    dev->gpio_ready_enabled = false;
+    dev->gpio_active_high = false;
+    dev->int_gpio = GPIO_NUM_MAX;
+    dev->gpio_ready_sem = NULL;
+
     ESP_LOGI(TAG, "Init OK addr=0x%02X budget=%" PRIu32 " us", dev->addr_7b, timing_budget_us);
     dev->inited = true;
     return ESP_OK;
@@ -229,15 +234,21 @@ esp_err_t vl53l0x_enable_gpio_ready(vl53l0x_dev_t *dev,
     if (!dev->inited) return ESP_ERR_INVALID_STATE;
     if (int_gpio == GPIO_NUM_MAX) return ESP_ERR_INVALID_ARG;
 
+    VL53L0X_Error st = VL53L0X_SetDeviceMode(&dev->st, VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
+    if (st != VL53L0X_ERROR_NONE) {
+        ESP_LOGE(TAG, "SetDeviceMode failed st=%d", (int)st);
+        return ESP_FAIL;
+    }
+
     VL53L0X_InterruptPolarity polarity = active_high
         ? VL53L0X_INTERRUPTPOLARITY_HIGH
         : VL53L0X_INTERRUPTPOLARITY_LOW;
 
-    VL53L0X_Error st = VL53L0X_SetGpioConfig(&dev->st,
-                                            0,
-                                            VL53L0X_DEVICEMODE_SINGLE_RANGING,
-                                            VL53L0X_GPIOFUNCTIONALITY_NEW_MEASURE_READY,
-                                            polarity);
+    st = VL53L0X_SetGpioConfig(&dev->st,
+                              0,
+                              VL53L0X_DEVICEMODE_CONTINUOUS_RANGING,
+                              VL53L0X_GPIOFUNCTIONALITY_NEW_MEASURE_READY,
+                              polarity);
     if (st != VL53L0X_ERROR_NONE) {
         ESP_LOGE(TAG, "SetGpioConfig failed st=%d", (int)st);
         return ESP_FAIL;
