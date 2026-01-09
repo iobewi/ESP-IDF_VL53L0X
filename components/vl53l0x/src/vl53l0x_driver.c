@@ -160,7 +160,7 @@ esp_err_t vl53l0x_init(vl53l0x_dev_t *dev, uint32_t timing_budget_us)
     }
 
     memset(&dev->st, 0, sizeof(dev->st));
-    dev->st.I2cDevAddr = dev->addr_7b;
+    dev->st.I2cDevAddr = (uint8_t)(dev->addr_7b << 1);
     dev->st.comms_speed_khz = 400;
 
     //(void)VL53L0X_ResetDevice(&st);
