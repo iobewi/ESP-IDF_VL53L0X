@@ -31,24 +31,52 @@ int32_t VL53L0X_trace_config(char *filename, uint32_t modules, uint32_t level, u
     return 0;
 }
 
+static bool vl53_trace_level_enabled(uint32_t level)
+{
+    if (_trace_level == TRACE_LEVEL_ALL) {
+        return true;
+    }
+    if (_trace_level == TRACE_LEVEL_NONE || _trace_level == TRACE_LEVEL_IGNORE) {
+        return false;
+    }
+
+    return level <= _trace_level;
+}
+
+static esp_log_level_t vl53_map_log_level(uint32_t level)
+{
+    switch (level) {
+    case TRACE_LEVEL_ERRORS:
+        return ESP_LOG_ERROR;
+    case TRACE_LEVEL_WARNING:
+        return ESP_LOG_WARN;
+    case TRACE_LEVEL_INFO:
+        return ESP_LOG_INFO;
+    case TRACE_LEVEL_DEBUG:
+    case TRACE_LEVEL_ALL:
+        return ESP_LOG_DEBUG;
+    case TRACE_LEVEL_NONE:
+    case TRACE_LEVEL_IGNORE:
+    default:
+        return ESP_LOG_DEBUG;
+    }
+}
+
 static void vl53_log_vprintf(uint32_t level, const char *fmt, va_list ap)
 {
-    /* Heuristique simple: TRACE_LEVEL_ERROR > WARN > INFO > DEBUG */
-    if (level & TRACE_LEVEL_ERROR) {
-        esp_log_writev(ESP_LOG_ERROR, VL53L0X_LOG_TAG, fmt, ap);
-    } else if (level & TRACE_LEVEL_WARNING) {
-        esp_log_writev(ESP_LOG_WARN,  VL53L0X_LOG_TAG, fmt, ap);
-    } else if (level & TRACE_LEVEL_INFO) {
-        esp_log_writev(ESP_LOG_INFO,  VL53L0X_LOG_TAG, fmt, ap);
-    } else {
-        esp_log_writev(ESP_LOG_DEBUG, VL53L0X_LOG_TAG, fmt, ap);
-    }
+    /* Heuristique simple: TRACE_LEVEL_ERRORS > WARN > INFO > DEBUG */
+    esp_log_level_t esp_level = vl53_map_log_level(level);
+    esp_log_writev(esp_level, VL53L0X_LOG_TAG, fmt, ap);
 }
 
 void trace_print_module_function(uint32_t module, uint32_t level, uint32_t function, const char *format, ...)
 {
     (void)module;
     (void)function;
+
+    if (!vl53_trace_level_enabled(level)) {
+        return;
+    }
 
     va_list ap;
     va_start(ap, format);
