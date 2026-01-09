@@ -1,8 +1,38 @@
-# For more information about build system see
-# https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html
-# The following five lines of boilerplate have to be in your project's
-# CMakeLists in this exact order for cmake to work correctly
-cmake_minimum_required(VERSION 3.16)
+idf_component_register(
+    SRCS
+        # ---- ST API ----
+        "st_api/core/src/vl53l0x_api.c"
+        "st_api/core/src/vl53l0x_api_calibration.c"
+        "st_api/core/src/vl53l0x_api_core.c"
+        "st_api/core/src/vl53l0x_api_ranging.c"
+        "st_api/core/src/vl53l0x_api_strings.c"
 
-include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(ESP-IDF_VL53L0X)
+        # PLATFORM (doit fournir VL53L0X_WrByte/RdByte/...)
+        "st_api/platform/src/vl53l0x_platform.c"
+        "st_api/platform/src/vl53l0x_platform_log.c"
+        "st_api/platform/src/vl53l0x_i2c_platform.c"
+
+        # ---- ESP-IDF driver layer ----
+        "src/vl53l0x_driver.c"
+
+    INCLUDE_DIRS
+        "include"
+
+        # headers ST
+        "st_api/core/inc"
+        "st_api/platform/inc"
+
+    REQUIRES
+        esp_driver_i2c
+        esp_driver_gpio
+        freertos
+        esp_timer
+        log
+)
+
+# Keep -Wall/-Wextra, but avoid ST warnings breaking the build (IDF enables -Werror globally).
+target_compile_options(${COMPONENT_LIB} PRIVATE
+    -Wall -Wextra
+    -Wno-error=maybe-uninitialized
+    -Wno-error=absolute-value
+)
