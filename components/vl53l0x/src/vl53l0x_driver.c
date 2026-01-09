@@ -17,23 +17,23 @@
 #include "vl53l0x_def.h"
 
 /*
- * NOTE ARCHI:
- * - Ce fichier contient la "driver layer" ESP-IDF (bus init, probe, init capteur, lecture).
- * - La ST API appelle la couche "platform" (st_api/platform) qui, elle, se contente
- *   de wrappers I2C byte/word/dword via vl53l0x_i2c_{read,write}_reg().
+ * Architecture note:
+ * - This file provides the ESP-IDF driver layer (bus init, probe, sensor init, read).
+ * - The ST API calls the "platform" layer (st_api/platform), which exposes
+ *   I2C byte/word/dword wrappers via vl53l0x_i2c_{read,write}_reg().
  */
 
 static const char *TAG = "vl53l0x";
 static bool isr_service_installed = false;
 
-/* Ces symboles sont implémentés dans st_api/platform/src/vl53l0x_i2c_platform.c */
+/* These symbols are implemented in st_api/platform/src/vl53l0x_i2c_platform.c */
 extern esp_err_t vl53l0x_i2c_master_init(gpio_num_t sda,
                                         gpio_num_t scl,
                                         uint32_t clk_hz);
 
 extern esp_err_t vl53l0x_i2c_probe(uint8_t addr_7b);
 
-/* ---- Implémentations issues de l'ancien vl53l0x_i2c_platform.c ---- */
+/* ---- Implementations adapted from the legacy vl53l0x_i2c_platform.c ---- */
 static esp_err_t st_init_sequence(VL53L0X_Dev_t *pDevice, uint32_t timing_budget_us)
 {
     VL53L0X_Error st;
@@ -107,7 +107,7 @@ esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
         seen_addr[addr] = true;
     }
 
-    /* 1) XSHUT GPIO init + all OFF */
+    /* 1) Initialize XSHUT GPIOs and power all sensors off. */
     for (int i = 0; i < slot_count; i++) {
         gpio_num_t g = slots[i].xshut_gpio;
         if (g == GPIO_NUM_MAX) return ESP_ERR_INVALID_ARG;
@@ -122,13 +122,13 @@ esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
     }
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    /* 2) One-by-one: ON -> set addr -> keep ON */
+    /* 2) One-by-one: power on -> set address -> keep on. */
     for (int i = 0; i < slot_count; i++) {
 
         gpio_set_level(slots[i].xshut_gpio, 1);
         vTaskDelay(pdMS_TO_TICKS(boot_delay_ms));
 
-        /* Sensor must respond at default address */
+        /* The sensor must respond at the default address. */
         esp_err_t err = vl53l0x_i2c_probe(VL53L0X_I2C_ADDRESS_DEFAULT_7B);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Probe default 0x%02X failed slot=%d err=%d",
@@ -140,7 +140,7 @@ esp_err_t vl53l0x_multi_assign_addresses(const vl53l0x_slot_t *slots,
         st.I2cDevAddr = (uint8_t)(VL53L0X_I2C_ADDRESS_DEFAULT_7B << 1); /* 8-bit left-aligned */
         st.comms_speed_khz = 400;
 
-        /* ST expects left-aligned address => << 1 */
+        /* ST expects a left-aligned address (7-bit << 1). */
         VL53L0X_Error st_err = VL53L0X_SetDeviceAddress(&st, (uint8_t)(slots[i].new_addr_7b << 1));
         if (st_err != VL53L0X_ERROR_NONE) {
             ESP_LOGE(TAG, "SetDeviceAddress slot=%d failed st=%d", i, (int)st_err);
@@ -181,7 +181,7 @@ esp_err_t vl53l0x_init(vl53l0x_dev_t *dev, uint32_t timing_budget_us)
     dev->st.I2cDevAddr = (uint8_t)(dev->addr_7b << 1);
     dev->st.comms_speed_khz = 400;
 
-    //(void)VL53L0X_ResetDevice(&st);
+    // (void)VL53L0X_ResetDevice(&st);
     vTaskDelay(pdMS_TO_TICKS(10));
 
     err = st_init_sequence(&dev->st, timing_budget_us);
@@ -210,7 +210,7 @@ esp_err_t vl53l0x_read_mm(vl53l0x_dev_t *dev, uint16_t *mm)
     if (e != VL53L0X_ERROR_NONE) return ESP_FAIL;
 
     if (data.RangeStatus != 0) {
-        // Debug (Q16.16 -> Mcps)
+        // Debug output (Q16.16 -> Mcps).
         float sig = (float)data.SignalRateRtnMegaCps  / 65536.0f;
         float amb = (float)data.AmbientRateRtnMegaCps / 65536.0f;
 

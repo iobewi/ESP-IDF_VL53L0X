@@ -7,12 +7,12 @@
 #include "esp_log.h"
 
 /*
- * La ST API utilise un système de trace optionnel.
- * Ici, on mappe vers ESP_LOGx.
+ * The ST API uses an optional trace system.
+ * Here we map it to ESP_LOGx.
  *
- * Pour activer:
- *   - ajouter -DVL53L0X_LOG_ENABLE=1 au composant (target_compile_definitions)
- *   - éventuellement définir VL53L0X_LOG_TAG
+ * To enable:
+ *   - add -DVL53L0X_LOG_ENABLE=1 to the component (target_compile_definitions)
+ *   - optionally define VL53L0X_LOG_TAG
  */
 
 #ifndef VL53L0X_LOG_TAG
@@ -21,7 +21,7 @@
 
 uint32_t _trace_level = 0;
 
-/* ST: configure un fichier de log; sur ESP-IDF on ignore "filename" et on garde level. */
+/* ST: configure a log file; on ESP-IDF we ignore "filename" and keep the level. */
 int32_t VL53L0X_trace_config(char *filename, uint32_t modules, uint32_t level, uint32_t functions)
 {
     (void)filename;
@@ -64,7 +64,7 @@ static esp_log_level_t vl53_map_log_level(uint32_t level)
 
 static void vl53_log_vprintf(uint32_t level, const char *fmt, va_list ap)
 {
-    /* Heuristique simple: TRACE_LEVEL_ERRORS > WARN > INFO > DEBUG */
+    /* Simple heuristic: TRACE_LEVEL_ERRORS > WARN > INFO > DEBUG. */
     esp_log_level_t esp_level = vl53_map_log_level(level);
     esp_log_writev(esp_level, VL53L0X_LOG_TAG, fmt, ap);
 }
@@ -86,6 +86,6 @@ void trace_print_module_function(uint32_t module, uint32_t level, uint32_t funct
 
 #else  /* VL53L0X_LOG_ENABLE */
 
-/* Compilé mais inactif: rien à faire (macros no-op dans le .h) */
+/* Compiled but inactive: nothing to do (macros are no-op in the .h). */
 
 #endif /* VL53L0X_LOG_ENABLE */

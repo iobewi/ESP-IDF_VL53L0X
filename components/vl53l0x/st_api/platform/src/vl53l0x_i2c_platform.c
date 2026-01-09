@@ -22,10 +22,10 @@ static const char *TAG = "vl53l0x";
  * ========================= */
 
 static i2c_master_bus_handle_t s_bus = NULL;
-/* Cache simple 7-bit -> dev handle (0..127) */
+/* Simple 7-bit -> device-handle cache (0..127). */
 static i2c_master_dev_handle_t s_dev[128] = {0};
 
-/* Valeurs par défaut */
+/* Default values. */
 #define VL53_I2C_TIMEOUT_MS      (50)
 #define VL53_I2C_ADDR_7B_DEFAULT (0x29)
 #define VL53_I2C_CLK_DEFAULT_HZ  (100000)
@@ -41,19 +41,19 @@ static esp_err_t i2c_bus_init_once(gpio_num_t sda, gpio_num_t scl)
     }
 
     i2c_master_bus_config_t bus_cfg = {
-        .i2c_port = -1, /* auto-alloc */
+        .i2c_port = -1, /* auto-allocate */
         .sda_io_num = sda,
         .scl_io_num = scl,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
         .flags = {
-            .enable_internal_pullup = 0, /* mets 0 si pullups externes */
+            .enable_internal_pullup = 0, /* set to 0 when using external pull-ups */
         },
     };
 
     esp_err_t err = i2c_new_master_bus(&bus_cfg, &s_bus);
     if (err == ESP_ERR_INVALID_STATE) {
-        /* déjà créé (rare, selon usage), on considère OK */
+        /* Already created (rare depending on usage), treat as OK. */
         return ESP_OK;
     }
     if (err != ESP_OK) {
@@ -97,9 +97,9 @@ static esp_err_t get_dev_handle(uint8_t addr_7b, uint32_t clk_hz, i2c_master_dev
 
 esp_err_t vl53l0x_i2c_master_init(gpio_num_t sda, gpio_num_t scl, uint32_t clk_hz)
 {
-    (void)clk_hz; /* fréquence configurée au niveau device dans get_dev_handle() */
+    (void)clk_hz; /* Frequency configured per device in get_dev_handle(). */
 
-    /* Reset cache devices si besoin (optionnel). Ici, on conserve si déjà init. */
+    /* Optionally reset cached devices if needed. Here we keep them if already initialized. */
     return i2c_bus_init_once(sda, scl);
 }
 

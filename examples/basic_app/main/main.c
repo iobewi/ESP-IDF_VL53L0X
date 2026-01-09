@@ -26,7 +26,7 @@ void app_main(void)
     err = vl53l0x_init(&dev, 33000);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "vl53l0x_init failed: %s", esp_err_to_name(err));
-        // boucle pour éviter reset en boucle
+        // Prevent a rapid reset loop on initialization failure.
         while (1) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 

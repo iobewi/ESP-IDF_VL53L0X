@@ -30,7 +30,7 @@ idf_component_register(
         log
 )
 
-# Laisse -Wall/-Wextra, mais évite que des warnings ST cassent le build (IDF met -Werror globalement).
+# Keep -Wall/-Wextra, but avoid ST warnings breaking the build (IDF enables -Werror globally).
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wall -Wextra
     -Wno-error=maybe-uninitialized

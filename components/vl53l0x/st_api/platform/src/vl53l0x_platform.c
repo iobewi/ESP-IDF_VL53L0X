@@ -8,7 +8,7 @@
 #include "vl53l0x_platform.h"
 #include "vl53l0x_def.h"
 
-// Wrappers I2C (new driver) exposés par ton composant
+// I2C wrapper functions (new driver) exposed by the component.
 extern esp_err_t vl53l0x_i2c_write_reg(uint8_t addr_7b, uint8_t reg,
                                       const uint8_t *data, size_t len,
                                       uint32_t clk_hz);
@@ -20,7 +20,7 @@ static const char *TAG = "vl53_platform";
 
 static inline uint32_t dev_clk_hz(const VL53L0X_DEV Dev)
 {
-    // ST stocke souvent des kHz dans comms_speed_khz
+    // ST often stores kHz in comms_speed_khz.
     uint32_t khz = (Dev && Dev->comms_speed_khz) ? Dev->comms_speed_khz : 400;
     return khz * 1000U;
 }
@@ -28,9 +28,9 @@ static inline uint32_t dev_clk_hz(const VL53L0X_DEV Dev)
 static inline uint8_t dev_addr_7b(const VL53L0X_DEV Dev)
 {
     // IMPORTANT:
-    // Dans l’API ST, I2cDevAddr est stockée en 8-bit "left aligned" (7b << 1).
-    // Ex: 0x29 -> 0x52
-    // On convertit ici systématiquement en 7-bit pour nos wrappers ESP-IDF.
+    // In the ST API, I2cDevAddr is stored as an 8-bit left-aligned address (7b << 1).
+    // Example: 0x29 -> 0x52
+    // Convert to 7-bit here for the ESP-IDF wrappers.
     if (!Dev) return 0;
 
     uint8_t a = Dev->I2cDevAddr;
@@ -39,7 +39,7 @@ static inline uint8_t dev_addr_7b(const VL53L0X_DEV Dev)
 }
 
 /**
- * ST API platform: écrit plusieurs octets
+ * ST API platform: write multiple bytes.
  */
 VL53L0X_Error VL53L0X_WriteMulti(VL53L0X_DEV Dev, uint8_t index, uint8_t *pdata, uint32_t count)
 {
@@ -132,11 +132,11 @@ void VL53L0X_WaitMs(VL53L0X_DEV Dev, int32_t wait_ms)
 }
 
 // -----------------------------------------------------------------------------
-// Compat ST "platform" legacy symbols
+// ST "platform" legacy compatibility symbols.
 // -----------------------------------------------------------------------------
-// Certaines versions de la ST API (et/ou certains ports) utilisent les symboles
-// VL53L0X_WrByte/RdByte/... au lieu de VL53L0X_WriteByte/ReadByte/...
-// Les sources core du repo que tu compiles les attendent.
+// Some ST API versions (and/or ports) use symbols such as
+// VL53L0X_WrByte/RdByte/... instead of VL53L0X_WriteByte/ReadByte/...
+// The core sources in this repository expect them.
 
 VL53L0X_Error VL53L0X_WrByte(VL53L0X_DEV Dev, uint8_t index, uint8_t data)
 {
