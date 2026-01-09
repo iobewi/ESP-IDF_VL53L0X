@@ -8,7 +8,7 @@ static const char *TAG = "gpio_ready_app";
 
 #define PIN_SDA GPIO_NUM_8
 #define PIN_SCL GPIO_NUM_9
-#define PIN_INT GPIO_NUM_1
+#define PIN_INT GPIO_NUM_2
 
 void app_main(void)
 {

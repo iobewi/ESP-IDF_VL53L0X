@@ -266,7 +266,7 @@ esp_err_t vl53l0x_enable_gpio_ready(vl53l0x_dev_t *dev,
     gpio_config_t io = {0};
     io.mode = GPIO_MODE_INPUT;
     io.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io.pull_up_en = GPIO_PULLUP_DISABLE;
+    io.pull_up_en = GPIO_PULLUP_ENABLE ;
     io.pin_bit_mask = (1ULL << int_gpio);
     io.intr_type = active_high ? GPIO_INTR_POSEDGE : GPIO_INTR_NEGEDGE;
 
