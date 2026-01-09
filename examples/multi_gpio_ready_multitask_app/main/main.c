@@ -14,8 +14,8 @@ static const char *TAG = "multi_gpio_ready_mt";
 #define XSHUT_0 GPIO_NUM_3
 #define XSHUT_1 GPIO_NUM_5
 
-#define INT_0 GPIO_NUM_1
-#define INT_1 GPIO_NUM_2
+#define INT_0 GPIO_NUM_2
+#define INT_1 GPIO_NUM_4
 
 typedef struct {
     const char *label;
