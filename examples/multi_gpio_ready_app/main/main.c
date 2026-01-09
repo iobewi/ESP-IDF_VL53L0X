@@ -13,8 +13,8 @@ static const char *TAG = "multi_gpio_ready";
 #define XSHUT_0 GPIO_NUM_3
 #define XSHUT_1 GPIO_NUM_5
 
-#define INT_0 GPIO_NUM_1
-#define INT_1 GPIO_NUM_2
+#define INT_0 GPIO_NUM_2
+#define INT_1 GPIO_NUM_4
 
 static void log_measurement(const char *label,
                             VL53L0X_RangingMeasurementData_t *data)
