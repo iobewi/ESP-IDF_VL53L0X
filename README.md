@@ -69,6 +69,8 @@ VL53L0X_ClearInterruptMask(&dev.st, 0);
 ```
 
 Un exemple complet est disponible dans `examples/gpio_ready_app`.
+Un exemple combinant **multi-capteurs** + **GPIO ready** est disponible dans
+`examples/multi_gpio_ready_app`.
 
 #### Câblage du pin GPIO/INT
 
